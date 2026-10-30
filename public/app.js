@@ -141,10 +141,24 @@ function marcarCartao(item) {
   }
 }
 
+const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+const restantes = () => { const p = M.progresso(SECOES, estado.respostas); return p.total - p.feitas; };
+
+function montarBarra() {
+  document.getElementById('barra').replaceChildren(...SECOES.map(() => h('span', { class: 'seg' }, h('i'))));
+}
 function atualizarBarra() {
   const p = M.progresso(SECOES, estado.respostas);
-  document.getElementById('barra-fill').style.width = `${p.percentual}%`;
-  document.getElementById('barra').setAttribute('aria-valuenow', String(p.percentual));
+  const barra = document.getElementById('barra');
+  barra.setAttribute('aria-valuenow', String(p.percentual));
+  barra.setAttribute('aria-valuetext', `${p.feitas} de ${p.total} perguntas`);
+  const atual = passos().find((x) => x.id === estado.atual)?.i;
+  [...barra.children].forEach((seg, n) => {
+    const ps = M.progressoSecao(SECOES[n], estado.respostas);
+    seg.firstChild.style.width = ps.total ? `${Math.round((ps.feitas / ps.total) * 100)}%` : '0%';
+    seg.classList.toggle('atual', n === atual);
+    seg.classList.toggle('feito', ps.total > 0 && ps.feitas === ps.total);
+  });
   document.getElementById('barra-txt').textContent = `${p.percentual}%`;
 }
 
@@ -190,14 +204,25 @@ function campoSimples(item, valor, aoMudar, { tipo, campo } = {}) {
 function rotuloOpcao(o) {
   return h('span', null, o.l, o.d ? h('small', null, o.d) : null);
 }
+// Mais de 6 opções: mostra as 5 primeiras e recolhe o resto (abre sozinho se algo recolhido estiver marcado).
+function comMais(opcoes, fazOpcao, marcada, papel) {
+  if (opcoes.length <= 6) return h('div', { class: 'opcoes', role: papel }, opcoes.map(fazOpcao));
+  const vis = opcoes.slice(0, 5);
+  const resto = opcoes.slice(5);
+  return h('div', { role: papel },
+    h('div', { class: 'opcoes' }, vis.map(fazOpcao)),
+    h('details', { class: 'mais-opcoes', open: resto.some((o) => marcada(o.v)) },
+      h('summary', null, `Mais opções (${resto.length})`),
+      h('div', { class: 'opcoes' }, resto.map(fazOpcao))));
+}
 function escolhaUnica(nome, opcoes, atual, aoMudar) {
-  return h('div', { class: 'opcoes', role: 'radiogroup' }, opcoes.map((o) => h('label', { class: 'opcao' },
-    h('input', { type: 'radio', name: nome, value: o.v, checked: atual === o.v, onchange: () => aoMudar(o.v) }), rotuloOpcao(o))));
+  return comMais(opcoes, (o) => h('label', { class: 'opcao' },
+    h('input', { type: 'radio', name: nome, value: o.v, checked: atual === o.v, onchange: () => aoMudar(o.v) }), rotuloOpcao(o)), (v) => v === atual, 'radiogroup');
 }
 function escolhaMultipla(nome, opcoes, atual, aoMudar) {
   const sel = new Set(Array.isArray(atual) ? atual : []);
-  return h('div', { class: 'opcoes' }, opcoes.map((o) => h('label', { class: 'opcao' },
-    h('input', { type: 'checkbox', name: nome, value: o.v, checked: sel.has(o.v), onchange: (e) => { e.target.checked ? sel.add(o.v) : sel.delete(o.v); aoMudar([...sel]); } }), rotuloOpcao(o))));
+  return comMais(opcoes, (o) => h('label', { class: 'opcao' },
+    h('input', { type: 'checkbox', name: nome, value: o.v, checked: sel.has(o.v), onchange: (e) => { e.target.checked ? sel.add(o.v) : sel.delete(o.v); aoMudar([...sel]); } }), rotuloOpcao(o)), (v) => sel.has(v), 'group');
 }
 
 function campoLista(item, valorCampo, campo, aoMudar) {
@@ -212,16 +237,19 @@ function widgetLista(item) {
   const caixa = h('div');
   const linhas = () => (Array.isArray(resp(item.id)?.valor) ? resp(item.id).valor : []);
   const gravar = (novas) => definir(item, { valor: novas });
+  const principais = item.campos.filter((c) => !c.extra);
+  const extras = item.campos.filter((c) => c.extra);
   const desenhar = () => {
     caixa.replaceChildren();
     linhas().forEach((linha, n) => {
-      const grade = h('div', { class: 'grade' }, item.campos.map((c) => h('div', null,
-        h('label', { class: 'rot' }, c.rotulo),
-        campoLista(item, linha[c.id], c, (v) => { const cp = linhas().map((x) => ({ ...x })); cp[n][c.id] = v; gravar(cp); }))));
+      const campo = (c) => h('div', null, h('label', { class: 'rot' }, c.rotulo),
+        campoLista(item, linha[c.id], c, (v) => { const cp = linhas().map((x) => ({ ...x })); cp[n][c.id] = v; gravar(cp); }));
       caixa.append(h('div', { class: 'linha-lista' },
         h('div', { class: 'cab' }, h('strong', null, `${item.rotuloLinha || 'Item'} ${n + 1}`),
           h('button', { type: 'button', class: 'remover', onclick: () => { gravar(linhas().filter((_, i) => i !== n)); desenhar(); } }, 'Remover')),
-        grade));
+        h('div', { class: 'grade' }, principais.map(campo)),
+        extras.length ? h('details', { class: 'dep', open: extras.some((c) => !M.valorVazio(linha[c.id])) },
+          h('summary', null, 'Mais detalhes (opcional)'), h('div', { class: 'grade' }, extras.map(campo))) : null));
     });
     caixa.append(h('div', { class: 'acoes' }, h('button', { type: 'button', class: 'botao', onclick: () => { gravar([...linhas(), {}]); desenhar(); } }, `+ ${item.rotuloAdicionar || 'Adicionar'}`)));
   };
@@ -286,11 +314,39 @@ function widgetServicos(item) {
 /* ---------- uma pergunta ---------- */
 function corpoConfirmar(item) {
   const r = () => resp(item.id) || {};
+  const SEC = [['corrigido', 'Corrigir'], ['complementado', 'Complementar'], ['conversar', 'Preciso conversar com Ricardo']];
+  let ajustando = SEC.some(([e]) => r().estado === e);
   const area = h('div', { class: 'complemento' });
-  const botoes = {};
-  const acoes = [['confirmado', 'Confirmar'], ['corrigido', 'Corrigir'], ['complementado', 'Complementar'], ['conversar', 'Preciso conversar com Ricardo']];
+  const sec = h('div', { class: 'conf conf-sec' });
+  const botoesSec = {};
+  const btnOk = h('button', {
+    type: 'button',
+    onclick: () => {
+      const novo = r().estado === 'confirmado' ? undefined : 'confirmado';
+      definir(item, { estado: novo });
+      if (novo === 'confirmado') { ajustando = false; avancarSuave(); } else clearTimeout(timerAvanco);
+      redesenhar();
+    },
+  }, 'Confirmar');
+  const btnAj = h('button', {
+    type: 'button',
+    onclick: () => {
+      ajustando = !ajustando;
+      if (ajustando && r().estado === 'confirmado') definir(item, { estado: undefined });
+      clearTimeout(timerAvanco);
+      redesenhar();
+    },
+  }, 'Ajustar');
+  SEC.forEach(([e, rot]) => {
+    botoesSec[e] = h('button', { type: 'button', onclick: () => { definir(item, { estado: r().estado === e ? undefined : e }); clearTimeout(timerAvanco); redesenhar(); } }, rot);
+    sec.append(botoesSec[e]);
+  });
   const redesenhar = () => {
-    for (const [e, b] of Object.entries(botoes)) b.setAttribute('aria-pressed', String(r().estado === e));
+    btnOk.setAttribute('aria-pressed', String(r().estado === 'confirmado'));
+    btnAj.setAttribute('aria-pressed', String(ajustando));
+    btnAj.setAttribute('aria-expanded', String(ajustando));
+    sec.hidden = !ajustando;
+    for (const [e, b] of Object.entries(botoesSec)) b.setAttribute('aria-pressed', String(r().estado === e));
     area.replaceChildren();
     const est = r().estado;
     if (est === 'corrigido' || est === 'complementado') {
@@ -306,19 +362,7 @@ function corpoConfirmar(item) {
     : h('p', null, item.resumo);
   const caixa = h('div', null,
     h('div', { class: 'resumo' }, h('b', null, 'Pelo que conversamos, ficou entendido que:'), resumo),
-    h('div', { class: 'conf' }, acoes.map(([e, rot]) => {
-      botoes[e] = h('button', {
-        type: 'button', 'aria-pressed': 'false',
-        onclick: () => {
-          const novo = r().estado === e ? undefined : e;
-          definir(item, { estado: novo });
-          redesenhar();
-          if (novo === 'confirmado') avancarSuave(); else clearTimeout(timerAvanco);
-        },
-      }, rot);
-      return botoes[e];
-    })),
-    area);
+    h('div', { class: 'conf' }, btnOk, btnAj), sec, area);
   redesenhar();
   return caixa;
 }
@@ -386,13 +430,14 @@ function cartao(item) {
 
   const campoDuvida = h('textarea', { rows: 2, placeholder: 'O que você precisa que eu esclareça?', 'aria-label': 'Explique sua dúvida', hidden: !r().duvida?.marcada, oninput: (e) => definir(item, { duvida: { marcada: true, texto: e.target.value } }) }, r().duvida?.texto || '');
   const marca = h('input', { type: 'checkbox', checked: Boolean(r().duvida?.marcada), onchange: (e) => { definir(item, { duvida: { ...(r().duvida || {}), marcada: e.target.checked } }); campoDuvida.hidden = !e.target.checked; } });
-  const duvida = h('details', { class: 'duvida', open: Boolean(r().duvida?.marcada) },
-    h('summary', null, 'Tenho uma dúvida sobre esta pergunta'),
+  const mais = h('details', { class: 'mais', open: Boolean(r().estado in M.ESTADOS_ESPECIAIS || r().duvida?.marcada) },
+    h('summary', null, item.tipo === 'confirmar' ? 'Tenho uma dúvida' : 'Não sei responder ou tenho uma dúvida'),
+    item.tipo === 'confirmar' ? null : atalhos,
     h('label', { class: 'opcao' }, marca, h('span', null, 'Marcar como dúvida para o Ricardo')), campoDuvida);
 
   let dep = null;
   if (item.grupo === 'terceiros' || item.responsavel) {
-    dep = h('details', { class: 'dep', open: item.grupo === 'terceiros' },
+    dep = h('details', { class: 'dep', open: Boolean((item.grupo === 'terceiros' && item.tipo !== 'confirmar') || r().responsavel || r().falta) },
       h('summary', null, 'Depende de outra pessoa? Diga quem resolve e o que falta'),
       h('label', { class: 'rot' }, 'Quem resolve?'),
       h('select', { 'aria-label': 'Quem resolve', onchange: (e) => definir(item, { responsavel: e.target.value }) },
@@ -408,7 +453,7 @@ function cartao(item) {
     h('h2', null, item.titulo),
     item.ajuda ? h('p', { class: 'ajuda' }, item.ajuda) : null,
     grupo,
-    corpo, dep, atalhos.childElementCount ? atalhos : null, duvida, ref,
+    corpo, dep, mais, ref,
     h('p', { class: 'q-meta' }, h('span', null, item.levId || item.id),
       item.obrigatorio ? h('span', { class: 'importante' }, 'Importante') : h('span', null, 'Opcional'),
       h('span', { class: 'ok estado-ok', hidden: !M.tratada(item, r()) }, 'Anotado')));
@@ -456,6 +501,13 @@ function telaInicio() {
       h('button', { type: 'button', class: 'link', onclick: () => arquivo.click() }, 'Carregar rascunho'), arquivo));
 }
 
+function marcoTexto(pct) {
+  if (pct >= 75) return 'Última reta.';
+  if (pct >= 50) return 'Metade do caminho.';
+  if (pct >= 25) return 'Bom ritmo.';
+  return '';
+}
+
 function telaPasso() {
   const lista = passos();
   const n = posicao(lista);
@@ -464,20 +516,28 @@ function telaPasso() {
   const proximo = lista[n + 1];
   const s = passo.secao;
   const deste = lista.filter((x) => x.secao === s && x.tipo === 'q');
+  const falta = restantes();
   const previa = proximo
     ? h('span', null, h('small', null, proximo.tipo === 'assunto' ? 'Próximo assunto' : 'A seguir'), proximo.tipo === 'assunto' ? proximo.secao.titulo : proximo.item.titulo)
     : h('span', null, h('small', null, 'Última pergunta'), 'Revisar e enviar');
 
   document.getElementById('topo-ctx').textContent = passo.tipo === 'assunto'
     ? s.titulo
-    : `${s.titulo} · ${deste.findIndex((x) => x.id === passo.id) + 1} de ${deste.length}`;
+    : `${s.titulo} · ${deste.findIndex((x) => x.id === passo.id) + 1} de ${deste.length}${falta <= 10 ? ` · faltam ${falta}` : ''}`;
 
   if (passo.tipo === 'assunto') {
     const ps = M.progressoSecao(s, estado.respostas);
+    const anterior = passo.i > 0 ? SECOES[passo.i - 1] : null;
+    const anteriorFeito = anterior && (() => { const pa = M.progressoSecao(anterior, estado.respostas); return pa.total > 0 && pa.feitas === pa.total; })();
+    const pct = M.progresso(SECOES, estado.respostas).percentual;
+    const abertos = SECOES.filter((x) => { const px = M.progressoSecao(x, estado.respostas); return px.feitas < px.total; }).length;
+    const frase = [anteriorFeito ? `${anterior.titulo} concluído.` : '', marcoTexto(pct), falta ? `Faltam ${plural(falta, 'pergunta', 'perguntas')} em ${plural(abertos, 'assunto', 'assuntos')}.` : 'Tudo respondido.'].filter(Boolean).join(' ');
     return h('div', null,
       h('section', { class: 'assunto' },
-        h('p', { class: 'conta' }, `${s.cliente ? `${s.cliente} · ` : ''}${deste.length} perguntas${ps.feitas ? `, ${ps.feitas} já respondidas` : ''}`),
-        h('h2', null, s.titulo), s.intro ? h('p', { class: 'suave' }, s.intro) : null),
+        h('h2', null, s.titulo),
+        s.intro ? h('p', { class: 'suave' }, s.intro) : null,
+        h('p', { class: 'conta' }, `${s.cliente && s.cliente !== s.titulo ? `${s.cliente} · ` : ''}${plural(deste.length, 'pergunta', 'perguntas')} neste assunto${ps.feitas ? `, ${ps.feitas} já respondidas` : ''}.`),
+        h('p', { class: 'conquista' }, anteriorFeito ? icone('check') : null, frase)),
       navegacao(h('span', null, h('small', null, 'Primeira pergunta'), deste[0] ? deste[0].item.titulo : ''), () => ir(1), 'Começar este assunto'));
   }
   return h('div', null, cartao(passo.item), navegacao(previa, () => ir(1), proximo ? 'Próxima' : 'Revisar respostas'));
@@ -616,4 +676,5 @@ document.getElementById('topo-voltar').addEventListener('click', () => {
 document.getElementById('topo-menu').addEventListener('click', () => mostrar('inicio'));
 
 carregar();
+montarBarra();
 desenhar();

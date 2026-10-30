@@ -75,8 +75,11 @@ svg.i { width: 1.25em; height: 1.25em; fill: none; stroke: currentColor; stroke-
 .icone-btn svg { width: 24px; height: 24px; }
 .topo-ctx { margin: 0; flex: 1; min-width: 0; font-size: var(--tamanho-pequeno); color: var(--texto-suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .topo-pct { font-size: var(--tamanho-pequeno); color: var(--texto-suave); min-width: 3ch; text-align: right; }
-.barra { height: 3px; background: var(--carvao-alto); }
-.barra i { display: block; height: 100%; width: 0; background: var(--creme); transition: width .5s var(--ease); }
+/* progresso segmentado: um trecho por assunto; o trecho atual fica mais visível e os concluídos acendem por inteiro */
+.barra { max-width: var(--largura); margin: 0 auto; padding: 4px var(--gutter) 10px; display: flex; gap: 5px; }
+.barra .seg { flex: 1; height: 4px; background: var(--carvao-alto); border-radius: 2px; overflow: hidden; transition: background .3s; }
+.barra .seg.atual { background: var(--linha); }
+.barra .seg i { display: block; height: 100%; width: 0; background: var(--creme); border-radius: 2px; transition: width .6s var(--ease); }
 
 /* ---------- botões ---------- */
 .botao {
@@ -110,7 +113,9 @@ svg.i { width: 1.25em; height: 1.25em; fill: none; stroke: currentColor; stroke-
 /* ---------- entrada de assunto ---------- */
 .assunto { padding: 48px 0 0; animation: entra .45s var(--ease) both; }
 .assunto h2 { font-size: clamp(2rem, 7vw, 2.8rem); font-weight: var(--peso-leve); margin: 6px 0 16px; }
-.assunto .conta { color: var(--texto-suave); }
+.assunto .conta { color: var(--texto-suave); margin: 18px 0 6px; }
+.assunto .conquista { display: flex; align-items: center; gap: 10px; color: var(--creme); font-weight: var(--peso-medio); margin: 4px 0 0; }
+.assunto .conquista svg { width: 1.3em; height: 1.3em; flex: none; stroke-width: 2.6; }
 
 /* ---------- pergunta (uma por tela) ---------- */
 .q { padding: 28px 0 0; animation: entra .38s var(--ease) both; }
@@ -160,7 +165,9 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--f
 .opcao > span { line-height: 1.35; }
 
 /* confirmar / corrigir */
-.conf { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.conf { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.conf-sec { grid-template-columns: 1fr; margin-top: 10px; }
+.conf-sec[hidden] { display: none; }
 .conf button { min-height: var(--alvo); border-radius: var(--raio-pilula); border: 1.5px solid var(--linha); background: transparent; color: var(--texto); font: inherit; font-weight: var(--peso-medio); padding: 10px 20px; cursor: pointer; transition: background .2s, color .2s, border-color .2s; }
 .conf button:hover { border-color: var(--texto-suave); }
 .conf button:first-child { border-color: var(--creme); font-weight: var(--peso-forte); }
@@ -172,7 +179,12 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--f
 .chip { border: 1.5px solid var(--linha); background: transparent; color: var(--texto-suave); border-radius: var(--raio-pilula); min-height: 44px; padding: 0 16px; font: inherit; font-size: .88rem; cursor: pointer; }
 .chip:hover { border-color: var(--texto-suave); color: var(--texto); }
 .chip[aria-pressed=true] { border-color: var(--alerta); color: var(--alerta); font-weight: var(--peso-forte); }
-details.duvida, details.dep { margin-top: 14px; }
+details.mais, details.mais-opcoes, details.dep { margin-top: 14px; }
+details.mais { margin-top: 28px; }
+details.mais .atalhos { margin-top: 4px; }
+details.mais > .opcao { margin-top: 14px; }
+details.mais > textarea { margin-top: 10px; }
+details.mais-opcoes > .opcoes { margin-top: 10px; }
 details summary { cursor: pointer; color: var(--texto-suave); font-size: .9rem; min-height: 44px; display: flex; align-items: center; }
 details[open] > summary { color: var(--texto); }
 details.dep { border-top: 1px solid var(--linha); padding-top: 4px; }
@@ -186,7 +198,8 @@ details.dep { border-top: 1px solid var(--linha); padding-top: 4px; }
 .servico.sim { border-color: var(--creme); }
 .servico strong { font-weight: var(--peso-forte); font-size: 1.05rem; }
 .servico .origem { font-size: .78rem; color: var(--texto-suave); margin: 2px 0 6px; }
-.servico .opcoes { margin-top: 10px; }
+.servico .opcoes { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+.servico .opcao { flex: 1 1 auto; padding: 8px 16px; min-height: 44px; }
 
 /* navegação inferior: prévia da próxima pergunta + botão redondo */
 .nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; background: var(--carvao); }
@@ -230,7 +243,7 @@ details.dep { border-top: 1px solid var(--linha); padding-top: 4px; }
   .so-impressao .id { color: #555; font-size: 8pt; }
 }
 @media (min-width: 640px) {
-  .conf { grid-template-columns: repeat(2, 1fr); }
+  .conf-sec { grid-template-columns: repeat(3, 1fr); }
   .opcoes { max-width: 520px; }
   .opcoes.larga { max-width: none; }
 }

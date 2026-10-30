@@ -39,7 +39,7 @@ const base = `http://localhost:${servidor.address().port}`;
 const chrome = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(fs.existsSync);
 const navegador = await puppeteer.launch({ executablePath: chrome, headless: true });
 const falhas = [];
-const passo = async (nome, fn) => { try { await fn(); console.log('ok  -', nome); } catch (e) { falhas.push(nome); console.log('FALHOU -', nome, '\n   ', e.message.split('\n')[0]); } };
+const passo = async (nome, fn) => { try { await fn(); console.log('ok  -', nome); } catch (e) { falhas.push(nome); console.log('FALHOU -', nome, '\n   ', e.message.split('\n').slice(0, 6).join(' | ')); } };
 
 const pagina = await navegador.newPage();
 await pagina.setViewport({ width: 390, height: 844, isMobile: true, deviceScaleFactor: 2 });
@@ -57,6 +57,7 @@ const texto = (sel) => pagina.$eval(sel, (e) => e.textContent);
 const clicar = async (seletor, conteudo) => {
   const h = await pagina.evaluateHandle((sel, c) => [...document.querySelectorAll(sel)].find((e) => !c || e.textContent.includes(c)), seletor, conteudo);
   assert.ok(h.asElement(), `não achei ${seletor} ${conteudo || ''}`);
+  await h.asElement().evaluate((e) => e.scrollIntoView({ block: 'center', behavior: 'instant' })); // evita clicar sob a barra fixa de baixo
   await h.asElement().click();
 };
 const proxima = () => clicar('.redondo');
@@ -82,9 +83,24 @@ await passo('começa pela entrada do assunto Criyotec e vai à primeira pergunta
   await foto('03-confirmar');
 });
 
+await passo('gradiente de meta: barra tem um trecho por assunto e o atual se destaca', async () => {
+  assert.equal((await pagina.$$('#barra .seg')).length, 8);
+  assert.equal((await pagina.$$('#barra .seg.atual')).length, 1);
+});
+
+await passo('Hick: confirmar mostra só 2 botões; "Ajustar" revela os outros 3', async () => {
+  const visiveis = await pagina.$$eval('#q-CRY-06 .conf:not(.conf-sec) button', (b) => b.map((x) => x.textContent));
+  assert.deepEqual(visiveis, ['Confirmar', 'Ajustar']);
+  assert.equal(await pagina.$eval('#q-CRY-06 .conf-sec', (e) => e.hidden), true);
+  assert.equal(await pagina.$eval('#q-CRY-06 details.mais', (d) => d.open), false, 'dúvida começa recolhida');
+  await clicar('#q-CRY-06 .conf button', 'Ajustar');
+  assert.equal(await pagina.$eval('#q-CRY-06 .conf-sec', (e) => e.hidden), false);
+  assert.equal((await pagina.$$('#q-CRY-06 .conf-sec button')).length, 3);
+});
+
 await passo('corrigir exige texto e o progresso sobe', async () => {
   const antes = await texto('#barra-txt');
-  await clicar('#q-CRY-06 .conf button', 'Corrigir');
+  await clicar('#q-CRY-06 .conf-sec button', 'Corrigir');
   await pagina.type('#t-CRY-06', 'o fornecedor já enviou o aviso');
   assert.notEqual(await texto('#barra-txt'), antes);
   await foto('04-corrigir');
@@ -98,6 +114,13 @@ await passo('pergunta importante com texto livre; escolha avança sozinha até o
   await clicar('#q-CRY-02q .opcao', 'Em parte');
   await pagina.waitForSelector('.assunto');
   assert.match(await texto('.assunto h2'), /Betgo/);
+});
+
+await passo('gradiente de meta: ao concluir um assunto, o próximo mostra a conquista e quanto falta', async () => {
+  const t = await texto('.conquista');
+  assert.match(t, /Criyotec concluído/);
+  assert.match(t, /Faltam \d+ perguntas? em \d+ assuntos?/);
+  assert.equal(await pagina.$eval('#barra .seg', (s) => s.classList.contains('feito')), true);
 });
 
 await passo('confirmar avança sozinho para a próxima pergunta', async () => {
@@ -116,6 +139,23 @@ await passo('seções retiradas não aparecem no mapa', async () => {
   await pagina.waitForSelector('.assunto');
 });
 
+await passo('Hick: lista com muitas opções mostra 5 e recolhe o resto; abre sozinha se algo escondido estiver marcado', async () => {
+  await proxima(); await espera('BET-01');
+  await proxima(); await espera('BET-01q');
+  await proxima(); await espera('BET-04');
+  await proxima(); await espera('BET-05');
+  assert.equal((await pagina.$$('#q-BET-05 [role=group] > .opcoes > .opcao')).length, 5);
+  assert.match(await texto('#q-BET-05 details.mais-opcoes summary'), /Mais opções \(4\)/);
+  assert.equal(await pagina.$eval('#q-BET-05 details.mais-opcoes', (d) => d.open), false);
+  await clicar('#q-BET-05 details.mais-opcoes summary');
+  await clicar('#q-BET-05 details.mais-opcoes .opcao', 'Cupom ou bônus');
+  await pagina.reload();
+  await clicar('button', 'Continuar de onde parei');
+  await espera('BET-05');
+  assert.equal(await pagina.$eval('#q-BET-05 details.mais-opcoes', (d) => d.open), true);
+  assert.equal(await pagina.$eval('#q-BET-05 details.mais-opcoes input:checked', (i) => i.value), 'cupom');
+});
+
 await passo('condicional: "Sim" mostra a pergunta extra; "Não" pula', async () => {
   await irAoAssunto('Módulo de IA');
   await proxima();
@@ -132,13 +172,14 @@ await passo('condicional: "Sim" mostra a pergunta extra; "Não" pula', async () 
 await passo('"Preciso conversar" fica marcado; digitar depois desmarca; dúvida abre campo', async () => {
   await clicar('#topo-voltar'); await espera('IA-07');
   await clicar('#topo-voltar'); await espera('IA-06');
+  assert.equal(await pagina.$eval('#q-IA-06 details.mais', (d) => d.open), false, 'atalhos começam recolhidos');
+  await pagina.$eval('#q-IA-06 details.mais', (d) => (d.open = true));
   await clicar('#q-IA-06 .chip', 'Preciso conversar');
   assert.equal(await pagina.$eval('#q-IA-06 .chip[data-e=conversar]', (e) => e.getAttribute('aria-pressed')), 'true');
-  await pagina.type('#q-IA-06 textarea', 'depende do caso');
+  await pagina.type('#q-IA-06 > textarea', 'depende do caso');
   assert.equal(await pagina.$eval('#q-IA-06 .chip[data-e=conversar]', (e) => e.getAttribute('aria-pressed')), 'false');
-  await pagina.$eval('#q-IA-06 details.duvida', (d) => (d.open = true));
-  await clicar('#q-IA-06 details.duvida label');
-  await pagina.type('#q-IA-06 details.duvida textarea', 'qual o limite de valor?');
+  await clicar('#q-IA-06 details.mais label');
+  await pagina.type('#q-IA-06 details.mais textarea', 'qual o limite de valor?');
   await foto('07-duvida');
 });
 
@@ -150,6 +191,9 @@ await passo('lista repetível: custos com várias colunas', async () => {
   await clicar('#q-FIN-04 button', 'Adicionar ferramenta');
   await clicar('#q-FIN-04 button', 'Adicionar ferramenta');
   assert.equal((await pagina.$$('#q-FIN-04 .linha-lista')).length, 2);
+  assert.equal(await pagina.$eval('#q-FIN-04 .linha-lista > .grade', (g) => g.querySelectorAll('input,select,textarea').length), 4, 'só 4 campos à vista');
+  assert.match(await texto('#q-FIN-04 .linha-lista details.dep summary'), /Mais detalhes/);
+  assert.equal(await pagina.$eval('#q-FIN-04 .linha-lista details.dep', (d) => d.open), false);
   const campos = await pagina.$$('#q-FIN-04 .linha-lista input[type=text]');
   await campos[0].type('VPS');
   await foto('08-lista');

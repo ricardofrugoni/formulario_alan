@@ -24,8 +24,12 @@ Fundo carvão, folhas e campos em creme quente, texto branco-creme, tipografia g
 
 Estados já tratados: marcado (`:has(input:checked)`, `aria-pressed`), foco (anel azul claro), erro de destaque (`.q.erro`), oculto (`[hidden]`), reduzir movimento, impressão (`@media print`).
 
+## Gradiente de meta e lei de Hick (30/10)
+**Gradiente de meta** (quanto mais perto do fim, mais a pessoa acelera): barra segmentada com um trecho por assunto (o atual mais claro, os concluídos acesos por inteiro); a entrada de cada assunto mostra "<assunto anterior> concluído", um marco ("Bom ritmo", "Metade do caminho", "Última reta") e "Faltam N perguntas em M assuntos"; no topo, "faltam N" aparece quando restam 10 ou menos. Os marcos são contagens reais, sem estimativa de tempo.
+**Lei de Hick** (menos escolhas por tela): confirmar mostra só "Confirmar" e "Ajustar" (Corrigir, Complementar e Conversar aparecem ao ajustar); "Não sei", "Não se aplica", "Conversar" e "Dúvida" ficam num único link recolhido; listas com mais de 6 opções mostram 5 e recolhem o resto ("Mais opções (n)", que abre sozinho se algo escondido estiver marcado); a lista de custos mostra 4 campos e deixa os demais em "Mais detalhes" (campos com `extra: true` em `perguntas.js`); "Depende de outra pessoa" só começa aberto em perguntas comuns.
+
 ## Leis de UX aplicadas
-Hick (uma pergunta por tela, 8 obrigatórias no máximo), Fitts (alvos de 52 px, botão redondo no polegar), Miller (8 assuntos curtos), Jakob (padrão de onboarding conhecido), Zeigarnik e gradiente de meta (barra e contador sempre visíveis), Tesler (o sistema pré-preenche o que já foi dito), Postel (aceita "não sei" e texto livre), Von Restorff ("Confirmar" em destaque, botão redondo único), Pico-fim (tela de "Recebido!").
+Hick (uma pergunta por tela, recolhimento de atalhos e opções, 8 obrigatórias no máximo), Fitts (alvos de 52 px, botão redondo no polegar), Miller (8 assuntos curtos), Jakob (padrão de onboarding conhecido), Zeigarnik e gradiente de meta (barra segmentada, conquistas e "faltam N"), Tesler (o sistema pré-preenche o que já foi dito), Postel (aceita "não sei" e texto livre), Von Restorff ("Confirmar" em destaque, botão redondo único), Pico-fim (tela de "Recebido!").
 
 ## Regras do piso de qualidade que valem aqui
 Sem rótulo acima de título, sem borda lateral grossa em destaque, sem símbolos de texto como ícone, sem vidro desfocado, uma única animação de entrada por tela, sombras com deslocamento e desfoque, contraste mínimo 4,5:1 (valores anotados nos tokens).
