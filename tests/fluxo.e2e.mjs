@@ -76,34 +76,44 @@ await passo('começa pela entrada do assunto Criyotec e vai à primeira pergunta
   assert.match(await texto('.assunto h2'), /Criyotec/);
   await foto('02-assunto');
   await proxima();
-  await espera('CRY-02');
+  await espera('CRY-06');
   assert.equal(await pagina.$eval('#topo', (e) => e.hidden), false);
   assert.equal((await pagina.$$('.q')).length, 1, 'só uma pergunta por tela');
   await foto('03-confirmar');
 });
 
-await passo('confirmar avança sozinho para a próxima pergunta', async () => {
-  await clicar('#q-CRY-02 .conf button', 'Confirmar');
-  await espera('CRY-05');
-});
-
 await passo('corrigir exige texto e o progresso sobe', async () => {
   const antes = await texto('#barra-txt');
-  await clicar('#q-CRY-05 .conf button', 'Corrigir');
-  await pagina.type('#t-CRY-05', 'na verdade chegou uma conversa');
+  await clicar('#q-CRY-06 .conf button', 'Corrigir');
+  await pagina.type('#t-CRY-06', 'o fornecedor já enviou o aviso');
   assert.notEqual(await texto('#barra-txt'), antes);
   await foto('04-corrigir');
 });
 
-await passo('pergunta importante com texto livre e escolha com avanço automático', async () => {
-  await proxima(); await espera('CRY-06');
+await passo('pergunta importante com texto livre; escolha avança sozinha até o próximo assunto', async () => {
   await proxima(); await espera('CRY-01');
   await pagina.type('#q-CRY-01 textarea', 'faltam ver as mensagens em operação');
   await foto('05-texto');
   await proxima(); await espera('CRY-02q');
   await clicar('#q-CRY-02q .opcao', 'Em parte');
-  await espera('CRY-05q');
+  await pagina.waitForSelector('.assunto');
+  assert.match(await texto('.assunto h2'), /Betgo/);
+});
+
+await passo('confirmar avança sozinho para a próxima pergunta', async () => {
+  await proxima(); await espera('BET-01');
+  await clicar('#q-BET-01 .conf button', 'Confirmar');
+  await espera('BET-01q');
   await foto('06-escolha-apos-avanco');
+});
+
+await passo('seções retiradas não aparecem no mapa', async () => {
+  await clicar('#topo-menu');
+  const titulos = await pagina.$$eval('.mapa strong', (n) => n.map((x) => x.textContent));
+  assert.equal(titulos.includes('Leads fora do funil'), false);
+  assert.equal(titulos.length, 8);
+  await clicar('.mapa button', 'Betgo');
+  await pagina.waitForSelector('.assunto');
 });
 
 await passo('condicional: "Sim" mostra a pergunta extra; "Não" pula', async () => {
@@ -174,12 +184,10 @@ await passo('revisão separa dúvidas e pendentes; envio bloqueado sem as pergun
   await foto('10-revisao-bloqueada');
 });
 
-await passo('com as importantes respondidas (um deles como "não sei"), o envio libera', async () => {
+await passo('com a última importante como "não sei", o envio libera', async () => {
   await pagina.evaluate(() => {
     const c = 'faxa-form-alan-v1'; const d = JSON.parse(localStorage.getItem(c));
-    d.respostas['CRY-07'] = { valor: 'depois', estado: 'respondido' };
-    d.respostas['LEX-02'] = { estado: 'nao_sei' };
-    d.respostas['IA-09'] = { valor: 'responder primeiro contato', estado: 'respondido' };
+    d.respostas['IA-09'] = { estado: 'nao_sei' };
     localStorage.setItem(c, JSON.stringify(d));
   });
   await pagina.reload();
@@ -221,10 +229,10 @@ await passo('enviar manda as respostas ao servidor, apaga o rascunho e agradece'
   await pagina.waitForFunction(() => document.body.textContent.includes('Recebido!'));
   assert.equal(enviados.length, 1);
   const r = enviados[0].respostas;
-  assert.equal(r['CRY-02'].estado, 'confirmado');
-  assert.equal(r['CRY-05'].estado, 'corrigido');
+  assert.equal(r['BET-01'].estado, 'confirmado');
+  assert.equal(r['CRY-06'].estado, 'corrigido');
   assert.equal(r['IA-06'].duvida.texto, 'qual o limite de valor?');
-  assert.equal(r['LEX-02'].estado, 'nao_sei');
+  assert.equal(r['IA-09'].estado, 'nao_sei');
   assert.equal(await pagina.evaluate(() => localStorage.getItem('faxa-form-alan-v1')), null);
   await foto('11-enviado');
 });

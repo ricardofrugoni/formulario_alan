@@ -4,7 +4,9 @@ import { SECOES } from '../public/perguntas.js';
 import { todasPerguntas } from '../public/motor.js';
 
 // O levantamento fica fora deste repositório (contém dados de negócio); sem ele, os testes de vínculo são pulados.
-const ITENS = await import('../../levantamento/itens.mjs').then((m) => m.ITENS, () => null);
+const LEV = await import('../../levantamento/itens.mjs').then((m) => m, () => null);
+const ITENS = LEV?.ITENS;
+const FORA = new Set(LEV?.FORA_DO_FORMULARIO || []);
 const semLevantamento = ITENS ? false : 'levantamento/ ausente';
 const todas = todasPerguntas(SECOES);
 const levIds = new Set((ITENS || []).map((i) => i.id));
@@ -52,8 +54,14 @@ test('poucas perguntas obrigatórias (Hick: não travar o preenchimento)', () =>
   assert.ok(todas.filter((p) => p.obrigatorio).length <= 8);
 });
 
-test('toda pergunta do levantamento marcada com q aparece no formulário', { skip: semLevantamento }, () => {
+test('toda pergunta do levantamento com q está no formulário ou na lista de retiradas', { skip: semLevantamento }, () => {
   const cobertos = new Set(todas.map((p) => p.levId));
-  const faltando = ITENS.filter((i) => i.q && !cobertos.has(i.id)).map((i) => i.id);
+  const faltando = ITENS.filter((i) => i.q && !cobertos.has(i.id) && !FORA.has(i.id)).map((i) => i.id);
   assert.deepEqual(faltando, [], 'itens com pergunta sem campo no formulário');
+});
+
+test('itens retirados por decisão não reaparecem no formulário', { skip: semLevantamento }, () => {
+  const cobertos = new Set(todas.map((p) => p.levId));
+  const reapareceu = [...FORA].filter((id) => cobertos.has(id));
+  assert.deepEqual(reapareceu, []);
 });
